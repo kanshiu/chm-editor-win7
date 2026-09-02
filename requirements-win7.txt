@@ -1,0 +1,9 @@
+# Win7 兼容依赖锁定
+# Python 版本：3.8.10（最高支持 Win7 的版本）
+# 见 .github/workflows/build-win7.yml
+
+PyInstaller==4.10.1
+tkinterweb; sys_platform == "win32"
+
+# 可选：增强 CHM 导入（Windows 上可能需要预编译 wheel）
+# pychm 为可选依赖，core.py 的 _extract_chm 在导入失败时自动回退到 zipfile/7z
