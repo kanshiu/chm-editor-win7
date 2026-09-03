@@ -5,7 +5,7 @@ CHM Editor - Win7 便携 exe 打包脚本
 环境：必须在 Windows + Python 3.8.10 上运行（CI: windows-2019 runner）
 
 关键锁定：
-- PyInstaller 4.10.1（最后一个支持 Windows 7 的版本）
+- PyInstaller 5.13.2（最后一个支持 Windows 7 的版本）
 - --onedir（Win7 稳定性优于 onefile）
 - 注入 Win7/8/10/11 supportedOS manifest
 - 内置 Python 版本自检（>=3.9 明确警告）
@@ -29,7 +29,7 @@ def check_python_version():
     if (major, minor) > (3, MAX_SUPPORTED_MINOR):
         print("=" * 60)
         print("[警告] 当前 Python %d.%d 高于 3.%d" % (major, minor, MAX_SUPPORTED_MINOR))
-        print("PyInstaller 4.10.1 仅兼容到 Python 3.8，在更高版本上可能无法安装。")
+        print("PyInstaller 5.13.2 仅兼容到 Python 3.8，在更高版本上可能无法安装。")
         print("推荐：使用 Python 3.8.10 或 GitHub Actions (windows-2019) 自动构建。")
         print("=" * 60)
         return False
@@ -38,7 +38,7 @@ def check_python_version():
 
 
 def ensure_pyinstaller():
-    """确保 PyInstaller 4.10.1 已安装"""
+    """确保 PyInstaller 5.13.2 已安装"""
     try:
         import PyInstaller  # noqa
         from PyInstaller import __version__ as v
@@ -46,10 +46,10 @@ def ensure_pyinstaller():
             print("[提示] 当前 PyInstaller %s，将重新安装 4.10.1" % v)
             raise ImportError
     except ImportError:
-        print("[安装] PyInstaller 4.10.1 ...")
+        print("[安装] PyInstaller 5.13.2 ...")
         subprocess.check_call(
             [sys.executable, "-m", "pip", "install", "PyInstaller==4.10.1"])
-        print("[OK] PyInstaller 4.10.1 已安装")
+        print("[OK] PyInstaller 5.13.2 已安装")
 
 
 def build():
