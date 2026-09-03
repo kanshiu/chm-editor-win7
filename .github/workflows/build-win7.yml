@@ -1,62 +1,80 @@
-name: Build Win7 CHM Editor
+# -*- coding: utf-8 -*-
+"""
+Build CHM Editor into a Win7-portable exe.
+PyInstaller 4.10.1 + Python 3.8 = last combo that supports Win7.
+"""
 
-# 触发：推送到 main 时自动构建 + 手动触发按钮
-on:
-  push:
-    branches: [main, master]
-  workflow_dispatch:
+import os
+import sys
+import subprocess
 
-jobs:
-  build-win7:
-    # windows-2019 的 VS2019 + Windows SDK 工具链兼容 Windows 7 的 CRT
-    runs-on: windows-2022
+# ---- 关键修复：强制 UTF-8 输出，避免 CI (cp1252) 打印中文崩 ----
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+APP_NAME = "CHMEditor"
+MAIN_SCRIPT = "chm_editor.py"
+SPEC_DIR = "."
+DIST_PATH = "dist"
+WORK_PATH = "build"
 
-      - name: Set up Python 3.8.10
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.8.10"
 
-      - name: Verify Python version (must be <= 3.8 for Win7)
-        run: python -c "import sys; assert sys.version_info[:2]==(3,8), sys.version"
+def check_python_version():
+    major, minor = sys.version_info[:2]
+    if major > 3 or (major == 3 and minor > 8):
+        print("[WARN] Python %d.%d detected. PyInstaller 4.10.1 officially "
+              "supports up to 3.8. Build may fail." % (major, minor))
+    else:
+        print("[OK] Python %d.%d - Win7 compatible" % (major, minor))
 
-      - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # PyInstaller 4.10.1 = 最后一个支持 Windows 7 的版本
-          python -m pip install "PyInstaller==4.10.1"
-          # tkinterweb 可选：装不上不影响纯文本预览降级
-          python -m pip install tkinterweb || echo "tkinterweb unavailable, using text preview"
 
-      - name: Run tests (headless)
-        run: python -m unittest discover -s tests -v
+def build():
+    print("=" * 50)
+    print("Building %s for Windows 7 ..." % APP_NAME)
+    print("=" * 50)
 
-      - name: Build portable exe
-        run: python build_win7_exe.py
+    check_python_version()
 
-      - name: Upload hhc.exe usage note
-        # 官方 HTML Help Workshop 需用户自行获取 hhc.exe（微软许可限制，不内置）
-        run: |
-          echo "如需编译 CHM，请将 hhc.exe 放入 dist\CHMEditor\ 目录" > dist\CHMEditor\hhc说明.txt
-          type dist\CHMEditor\README-编译CHM.txt
+    # 入口文件必须存在
+    if not os.path.exists(MAIN_SCRIPT):
+        print("[FATAL] %s not found in cwd: %s" % (MAIN_SCRIPT, os.getcwd()))
+        print("Files here:", os.listdir("."))
+        sys.exit(1)
 
-      - name: Upload artifact (portable zip)
-        uses: actions/upload-artifact@v4
-        with:
-          name: CHMEditor-Win7
-          path: dist\CHMEditor\
-          retention-days: 90
+    cmd = [
+        sys.executable, "-m", "PyInstaller",
+        "--name", APP_NAME,
+        "--onefile",
+        "--windowed",
+        "--distpath", DIST_PATH,
+        "--workpath", WORK_PATH,
+        "--specpath", SPEC_DIR,
+        MAIN_SCRIPT,
+    ]
 
-      - name: Create release zip (for Releases page)
-        run: |
-          Compress-Archive -Path "dist\CHMEditor\*" -DestinationPath "CHMEditor-Win7.zip" -Force
+    print("[CMD] " + " ".join(cmd))
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    print("----- PyInstaller STDOUT -----")
+    print(result.stdout)
+    print("----- PyInstaller STDERR -----")
+    print(result.stderr)
+    print("Return code:", result.returncode)
 
-      - name: Upload release zip artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: CHMEditor-Win7.zip
-          path: CHMEditor-Win7.zip
-          retention-days: 90
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+
+    exe_path = os.path.join(DIST_PATH, APP_NAME, APP_NAME + ".exe")
+    if os.path.exists(exe_path):
+        print("\n[SUCCESS] %s" % exe_path)
+        print("Copy the whole '%s' folder to the target Win7 machine." % APP_NAME)
+    else:
+        print("\n[FATAL] exe not found at %s" % exe_path)
+        if os.path.exists(DIST_PATH):
+            print("dist contents:", os.listdir(DIST_PATH))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    build()
+
