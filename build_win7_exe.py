@@ -1,21 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-打包 CHM Editor 为 Win7 便携 exe
-使用 PyInstaller 5.13.2 + Python 3.8
-兼容 Windows 7 SP1
+Build CHM Editor as Win7 portable exe
+PyInstaller 5.13.2 + Python 3.8
 """
 
 import os
 import sys
-import shutil
 import subprocess
-import tempfile
 
 APP_NAME = "CHMEditor"
 MAIN_SCRIPT = "chm_editor.py"
 
-# Win7 兼容 manifest
-WIN7_MANIFEST = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+WIN7_MANIFEST = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
@@ -38,95 +34,88 @@ WIN7_MANIFEST = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         version="6.0.0.0" processorArchitecture="*" publicKeyToken="6595b64144ccf1df" language="*"/>
     </dependentAssembly>
   </dependency>
-</assembly>'''
+</assembly>"""
 
 def check_python_version():
-    """检查 Python 版本，警告但不阻止"""
     major, minor = sys.version_info[:2]
-    print("检测到 Python %d.%d.%d" % (major, minor, sys.version_info[2]))
+    print("Python %d.%d.%d detected" % (major, minor, sys.version_info[2]))
     if major > 3 or (major == 3 and minor > 8):
-        print("[WARN] Python %d.%d 可能不完全兼容 Win7，建议使用 3.8.x" % (major, minor))
+        print("[WARN] Python %d.%d - consider using 3.8.x for Win7" % (major, minor))
     else:
-        print("[OK] Python 版本适合 Win7 兼容构建")
+        print("[OK] Python version is compatible")
 
 def build():
     print("=" * 50)
-    print("  CHM Editor - Win7 便携版构建脚本")
+    print("  CHM Editor - Win7 Build")
     print("=" * 50)
-    
+
     check_python_version()
-    
-    # 写入 manifest 文件
-    manifest_path = "win7.manifest"
+
+    manifest_path = "win7_build_temp.manifest"
     with open(manifest_path, 'w', encoding='utf-8') as f:
         f.write(WIN7_MANIFEST)
-    print("[OK] 已生成 win7.manifest")
-    
-    # 检查主脚本
+    print("[OK] Manifest ready")
+
     if not os.path.exists(MAIN_SCRIPT):
-        print("[ERROR] 找不到 %s" % MAIN_SCRIPT)
+        print("[ERROR] %s not found!" % MAIN_SCRIPT)
         sys.exit(1)
-    
-    # 构建 PyInstaller 命令
+
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--name", APP_NAME,
         "--onefile",
         "--windowed",
-        "--noupx",          # 禁用 UPX，避免 Win7 闪退
+        "--noupx",
         "--manifest", manifest_path,
         "--distpath", "dist",
         "--workpath", "build",
         "--specpath", ".",
+        "--clean",
     ]
-    
-    # 添加隐藏导入（确保 tkinter 和相关模块被打包）
+
     hidden_imports = [
         "tkinter",
         "tkinter.scrolledtext",
         "tkinter.ttk",
-        "sqlite3",  # 如果搜索索引用了 sqlite
+        "tkinter.filedialog",
+        "tkinter.messagebox",
+        "tkinter.simpledialog",
     ]
     for mod in hidden_imports:
         cmd.extend(["--hidden-import", mod])
-    
-    # 如果有 hhc.exe，添加为二进制数据
+
     if os.path.exists("hhc.exe"):
         cmd.extend(["--add-binary", "hhc.exe;."])
-        print("[OK] 将 hhc.exe 打包进 exe")
-    
-    # 如果有 README，添加
+        print("[OK] hhc.exe will be bundled")
+
     if os.path.exists("README-编译CHM.txt"):
         cmd.extend(["--add-data", "README-编译CHM.txt;."])
-    
+
     cmd.append(MAIN_SCRIPT)
-    
-    print("\n执行打包命令...")
-    print(" ".join(cmd[:8]) + " ...")  # 简略显示
-    
+
+    print("Running PyInstaller...")
+    print("Command: %s" % " ".join(cmd[:8]) + " ...(truncated)")
+
     try:
         result = subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as e:
-        print("\n[ERROR] 打包失败，返回码: %d" % e.returncode)
+        print("[ERROR] Build failed, code %d" % e.returncode)
         sys.exit(1)
     finally:
-        # 清理 manifest 临时文件
         if os.path.exists(manifest_path):
             os.remove(manifest_path)
-    
-    # 检查产物
+
     exe_path = os.path.join("dist", APP_NAME + ".exe")
     if os.path.exists(exe_path):
-        size_mb = os.path.getsize(exe_path) / 1024 / 1024
-        print("\n" + "=" * 50)
-        print("  构建成功！")
+        size_mb = os.path.getsize(exe_path) / 1024.0 / 1024.0
+        print("")
         print("=" * 50)
-        print("输出文件: %s" % os.path.abspath(exe_path))
-        print("文件大小: %.1f MB" % size_mb)
-        print("\n将 dist 目录下的文件拷贝到目标 Win7 机器即可运行。")
-        print("如需编译 CHM，确保 hhc.exe 在 exe 同目录。")
+        print("  BUILD SUCCESSFUL")
+        print("=" * 50)
+        print("Output: %s" % os.path.abspath(exe_path))
+        print("Size: %.1f MB" % size_mb)
     else:
-        print("\n[ERROR] 未找到输出文件，打包可能失败")
+        print("[ERROR] exe not found!")
         sys.exit(1)
 
 if __name__ == '__main__':
